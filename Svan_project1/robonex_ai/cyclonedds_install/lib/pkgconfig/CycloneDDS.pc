@@ -1,0 +1,9 @@
+prefix=/home/abhijeet/Desktop/robot/Svan_project1/Svan_project1/robonex_ai/cyclonedds_install
+includedir=${prefix}/include
+libdir=${prefix}/lib
+
+Name: CycloneDDS
+Description: Eclipse Cyclone DDS library
+Version: 11.0.1
+Libs: -L${libdir} -lddsc
+Cflags: -I${includedir}

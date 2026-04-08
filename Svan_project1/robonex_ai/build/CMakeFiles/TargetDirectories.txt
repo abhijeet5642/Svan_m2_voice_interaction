@@ -1,0 +1,3 @@
+/home/abhijeet/Desktop/robot/Svan_project1/Svan_project1/robonex_ai/build/CMakeFiles/subscriber_node.dir
+/home/abhijeet/Desktop/robot/Svan_project1/Svan_project1/robonex_ai/build/CMakeFiles/edit_cache.dir
+/home/abhijeet/Desktop/robot/Svan_project1/Svan_project1/robonex_ai/build/CMakeFiles/rebuild_cache.dir
