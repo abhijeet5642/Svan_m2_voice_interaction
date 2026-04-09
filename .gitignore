@@ -1,2 +1,4 @@
 .env
 z.txt
+__pycache__/
+*.pyc
