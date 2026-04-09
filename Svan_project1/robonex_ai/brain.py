@@ -94,7 +94,8 @@ async def process_text_command(text_command: str):
         validated_command = LLMCommand(**json.loads(raw_content))
 
         with state_lock:
-            current_robot_state = validated_command.model_dump()
+            current_robot_state.clear()
+            current_robot_state.update(validated_command.model_dump())
 
             # Mode labeling
             mode_labels = {0: "sleep", 1: "stand", 4: "move"}
