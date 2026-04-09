@@ -8,6 +8,7 @@ from grokrules import system_rules
 # from llamarules import system_rules
 
 # Global State Memory
+state_lock = threading.Lock()
 current_robot_state = {
     "mode": 0,
     "mode_name": "sleep",
@@ -22,7 +23,9 @@ command_memory = []
 def continuous_publish_loop():
     while True:
         # Constantly publish the current state at ~50Hz (every 0.02 seconds)
-        robot_publisher.publish_movement(current_robot_state)
+        with state_lock:
+            state_to_publish = current_robot_state.copy()
+        robot_publisher.publish_movement(state_to_publish)
         time.sleep(0.02)
 
 # Start the thread immediately
@@ -37,13 +40,16 @@ async def process_text_command(text_command: str):
 
     
 
-    history_text = "None"
-    if command_memory:
-        history_text = "\n".join([f"- User: '{cmd['text']}' -> Robot: {cmd['state']}" for cmd in command_memory])
+    with state_lock:
+        history_text = "None"
+        if command_memory:
+            history_text = "\n".join([f"- User: '{cmd['text']}' -> Robot: {cmd['state']}" for cmd in command_memory])
+
+        current_state_snapshot = current_robot_state.copy()
 
     user_prompt = f"""
     PREVIOUS COMMAND HISTORY: {history_text}
-    LAST ROBOT STATE: {current_robot_state}
+    LAST ROBOT STATE: {current_state_snapshot}
     NEW USER COMMAND: '{text_command}'
     """
 
@@ -76,30 +82,42 @@ async def process_text_command(text_command: str):
             raise ValueError("Empty response from LLM")
 
         raw_content = raw_message.strip()
+        if raw_content.startswith("```json"):
+            raw_content = raw_content[7:]
+        if raw_content.startswith("```"):
+            raw_content = raw_content[3:]
+        if raw_content.endswith("```"):
+            raw_content = raw_content[:-3]
+        raw_content = raw_content.strip()
 
         # Parse JSON
         validated_command = LLMCommand(**json.loads(raw_content))
-        current_robot_state = validated_command.model_dump()
-        print(f" 🤖 New State Activated: {current_robot_state}")
 
-        # Mode labeling
-        mode_labels = {0: "sleep", 1: "stand", 4: "move"}
-        current_robot_state["mode_name"] = mode_labels.get(
-            current_robot_state.get("mode"), "unknown"
-        )
+        with state_lock:
+            current_robot_state = validated_command.model_dump()
 
-        # Memory
-        command_memory.append({
-            "text": text_command,
-            "state": current_robot_state
-        })
-        if len(command_memory) > 5:
-            command_memory.pop(0)
+            # Mode labeling
+            mode_labels = {0: "sleep", 1: "stand", 4: "move"}
+            current_robot_state["mode_name"] = mode_labels.get(
+                current_robot_state.get("mode"), "unknown"
+            )
+
+            # Memory
+            command_memory.append({
+                "text": text_command,
+                "state": current_robot_state.copy()
+            })
+            if len(command_memory) > 5:
+                command_memory.pop(0)
+
+            state_to_return = current_robot_state.copy()
+
+        print(f" 🤖 New State Activated: {state_to_return}")
 
         # DDS Publish
-        # robot_publisher.publish_movement(current_robot_state)
+        # robot_publisher.publish_movement(state_to_return)
 
-        return {"status": "success", "data": current_robot_state}
+        return {"status": "success", "data": state_to_return}
 
     except Exception as e:
         print(f"❌ Error: {str(e)}")
